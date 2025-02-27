@@ -105,30 +105,32 @@ self.rooms = {
 To monitor & control lighting settings, add this to your Lovelace dashboard:
 ```yaml
 views:
-  - title: "Lighting Control"
+  - title: Home
     sections:
       - type: grid
         cards:
           - type: entities
-            title: "Manual Overrides"
             entities:
+              - entity: input_boolean.den_automation
+                name: Enable Den Automation
               - entity: input_boolean.kitchen_automation
                 name: Enable Kitchen Automation
-              - entity: input_boolean.living_room_automation
-                name: Enable Living Room Automation
+              - entity: input_boolean.dining_automation
+                name: Enable Dining Automation
+              - entity: input_boolean.entry_automation
+                name: Enable Entry Automation
+              - entity: input_boolean.main_bath_automation
+                name: Enable Main Bath Automation
+              - entity: input_boolean.stairs
+            title: Manual Overrides
+            show_header_toggle: false
           - type: entities
-            title: "Lighting Overview"
-            entities:
-              - entity: sensor.kitchen_lux
-                name: Kitchen Lux Level
-              - entity: sensor.living_room_brightness_percentage
-                name: Living Room Brightness
-          - type: entities
-            title: "Lighting Settings"
+            title: Lighting Settings
+            show_header_toggle: false
             entities:
               - entity: input_number.lux_threshold
                 name: Lux Threshold for Lights
-              - entity: input_number.brightness_day
+              - entity: input_number.brightness_daytime
                 name: Brightness (Day)
               - entity: input_number.brightness_evening
                 name: Brightness (Evening)
@@ -137,10 +139,15 @@ views:
               - entity: input_number.dimming_duration_seconds
                 name: Dimming Duration (Seconds)
               - entity: input_number.fade_delay
-                name: Fade Delay
+              - entity: input_datetime.evening_start
+                name: Evening Mode Start
+              - entity: input_datetime.night_start_time
+                name: Night Mode Start
+        column_span: 2
 ```
 ## ✅ How It Works
 1️⃣ Presence detected → Lights turn on based on time of day or lux levels
+
 2️⃣ No motion detected → Lights fade out smoothly after a delay
 
 ## 📝 Customization
@@ -151,6 +158,8 @@ views:
 🔹 Customize fade delay and dimming duration
 
 ## 🔍 Troubleshooting
+`dynamic_lighting.py` will log to the AppDaemon addon logs to aid in troubleshooting.
+
 ❌ Lights don’t turn on?
 - Check if lux levels are above the threshold (input_number.lux_threshold).
 - Ensure presence sensor state is "on".
