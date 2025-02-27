@@ -3,7 +3,7 @@
 This script automates **smart lighting control** in Home Assistant using **presence sensors, lux sensors, and time-based brightness settings**.  
 
 💡 **Lights automatically adjust brightness based on time of day**  
-🚶 **Presence sensors turn lights on/off based on movement**  
+🚶 **Presence sensors turn lights on/off based on occupency**  
 🌞 **Lux sensors prevent lights from turning on when there's enough natural light**  
 🌙 **Smooth fade-out when no presence is detected**  
 
