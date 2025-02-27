@@ -94,18 +94,21 @@ class DynamicLighting(hass.Hass):
 
             if brightness > 0:
                 brightness_255 = self.percent_to_255(brightness)  # Convert 0-100% to 0-255
-                self.turn_on(light, brightness=brightness, transition=2)  # Smooth fade-in
+                self.turn_on(light, brightness=brightness_255, transition=2)  # Pass 255-based brightness
                 self.log(f"Turning on {room} lights at {brightness}% brightness (Converted: {brightness_255}/255, Lux: {pre_light_lux})")
-                # Store that the light was turned on
-                self.rooms[room]["light_on"] = True  
-
-                # Cancel any fade-out timer if it exists
-                fade_timer = self.rooms.get(room, {}).get("fade_timer")
-                if fade_timer is not None:
-                    self.cancel_timer(fade_timer)
-                    self.rooms[room]["fade_timer"] = None
             else:
-                self.rooms[room]["light_on"] = False  # Light was not turned on
+                # 🔹 Override 0% brightness → Set to minimum possible value (1/255)
+                self.log(f"Brightness is set to 0%, updating to minimum possible value (1/255).")
+                self.turn_on(light, brightness=1, transition=2)
+
+            # Store that the light was turned on
+            self.rooms[room]["light_on"] = True  
+
+            # Cancel any fade-out timer if it exists
+            fade_timer = self.rooms.get(room, {}).get("fade_timer")
+            if fade_timer is not None:
+                self.cancel_timer(fade_timer)
+                self.rooms[room]["fade_timer"] = None
 
         else:
             # Presence lost → Only schedule fade-out if light was actually turned on
@@ -129,7 +132,7 @@ class DynamicLighting(hass.Hass):
                 self.log(f"Skipping fade-out for {room} because lights never turned on.")
 
     def adaptive_fade_out(self, kwargs):
-        """Fades out the light using the built-in Hue transition if supported."""
+        """Fades out the light using the built-in transition if supported."""
         
         room = kwargs["room"]
         light = kwargs["light"]
@@ -148,7 +151,7 @@ class DynamicLighting(hass.Hass):
 
         self.log(f"Using built-in transition to fade out {room} over {dim_duration} seconds.")
 
-        # Use built-in Hue transition
+        # Use built-in transition
         self.turn_off(light, transition=dim_duration)
         self.log(f"{room} lights are fading out over {dim_duration} seconds.")
 
@@ -186,11 +189,14 @@ class DynamicLighting(hass.Hass):
             return 0  # No brightness needed
 
         # Determine brightness based on user-defined time settings
-        if now.time() >= night_time:  
+        if now.time() >= night_time:
+            self.log(f"Using night time brightness setting. Current time: {now.time()}. Night time: {night_time}.")
             brightness = brightness_night
-        elif now.time() >= evening_time:  
+        elif now.time() >= evening_time:
+            self.log(f"Using evening time brightness setting. Current time: {now.time()}. Evening time: {evening_time}.")
             brightness = brightness_evening
-        else:  
+        else:
+            self.log(f"Using day brightness setting. Current time: {now.time()}.")
             brightness = brightness_day
 
         self.log(f"Calculated brightness: {brightness}% (UI scale)")
