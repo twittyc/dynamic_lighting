@@ -28,7 +28,7 @@ This script automates **smart lighting control** in Home Assistant using **prese
 
 ### 📂 **1. Clone or Copy the Script**
 ```bash
-git clone https://github.com/YOUR_GITHUB_USERNAME/home-assistant-dynamic-lighting.git
+git clone https://github.com/twittyc/dynamic_lighting.git
 ```
 Or manually copy dynamic_lighting.py into:
 ```bash
