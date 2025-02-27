@@ -82,23 +82,27 @@ class DynamicLighting(hass.Hass):
             self.log(f"Automation disabled for {room}, skipping light control.")
             return
 
-        # Get lux threshold
+        # Get lux threshold and current lux level
         lux_threshold = float(self.get_state("input_number.lux_threshold", default=100))
+        current_lux = float(self.get_state(lux_sensor, default=0))
+
+        # Skip turning on lights if lux is above threshold
+        if current_lux > lux_threshold:
+            self.log(f"Skipping light activation in {room} due to high lux ({current_lux} lx > {lux_threshold} lx).")
+            return
 
         if new == "on":
             # Presence detected → Turn on the lights if brightness is needed
-            pre_light_lux = float(self.get_state(lux_sensor, default=0))
-            self.rooms[room]["last_lux"] = pre_light_lux
-
-            brightness = self.get_dynamic_brightness(pre_light_lux, lux_threshold)
+            self.rooms[room]["last_lux"] = current_lux
+            brightness = self.get_dynamic_brightness(current_lux, lux_threshold)
 
             if brightness > 0:
                 brightness_255 = self.percent_to_255(brightness)  # Convert 0-100% to 0-255
-                self.turn_on(light, brightness=brightness_255, transition=2)  # Pass 255-based brightness
-                self.log(f"Turning on {room} lights at {brightness}% brightness (Converted: {brightness_255}/255, Lux: {pre_light_lux})")
+                self.turn_on(light, brightness=brightness_255, transition=2)  # ✅ Pass correct brightness
+                self.log(f"Turning on {room} lights at {brightness}% brightness (Converted: {brightness_255}/255, Lux: {current_lux})")
             else:
-                # 🔹 Override 0% brightness → Set to minimum possible value (1/255)
-                self.log(f"Brightness is set to 0%, updating to minimum possible value (1/255).")
+                # 🔹 Special case: If brightness is set to 0%, override to minimum (1/255)
+                self.log(f"Brightness set to 0%, updating {room} to minimum brightness (1/255).")
                 self.turn_on(light, brightness=1, transition=2)
 
             # Store that the light was turned on
@@ -130,6 +134,7 @@ class DynamicLighting(hass.Hass):
                 self.rooms[room]["fade_timer"] = fade_timer
             else:
                 self.log(f"Skipping fade-out for {room} because lights never turned on.")
+
 
     def adaptive_fade_out(self, kwargs):
         """Fades out the light using the built-in transition if supported."""
