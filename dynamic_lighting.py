@@ -154,6 +154,9 @@ class DynamicLighting(hass.Hass):
         # ✅ Wait for the transition period to complete before verification
         time.sleep(transition * 2)
 
+        # ✅ Refresh only the group lights' states
+        self.force_refresh_states(group_lights)
+
         # Verify each light in the group
         failed_lights = [light for light in group_lights if self.get_state(light) != "off"]
 
@@ -167,11 +170,16 @@ class DynamicLighting(hass.Hass):
         for attempt in range(1, max_retries + 1):
             for light in failed_lights:
                 self.turn_off(light, transition=transition)
+                self.log(f"Issued turn off command for {light} (Retry {attempt})")
 
             time.sleep(transition * 2)  # Wait again for the transition
 
+            # ✅ Refresh only the failed lights' states before checking again
+            self.force_refresh_states(failed_lights)
+
             # Check again
             failed_lights = [light for light in failed_lights if self.get_state(light) != "off"]
+
             if not failed_lights:
                 self.log(f"All remaining lights in {light_group} successfully turned off after {attempt} retry(ies).")
                 return
@@ -315,3 +323,10 @@ class DynamicLighting(hass.Hass):
     def percent_to_255(self, brightness_percent):
         """Converts 0-100% brightness to the 0-255 scale used by Home Assistant."""
         return round((brightness_percent / 100) * 255)
+
+    def force_refresh_states(self, entities):
+        """Forces Home Assistant to refresh specific entity states to prevent stale readings."""
+        if not entities:
+            return
+        time.sleep(0.5)  # Small delay before requesting fresh states
+        self.call_service("homeassistant/update_entity", entity_id=entities)
