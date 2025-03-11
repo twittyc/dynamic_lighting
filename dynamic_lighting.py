@@ -97,38 +97,86 @@ class DynamicLighting(hass.Hass):
 
         return default_value
 
+    def get_group_lights(self, group_entity):
+        """Retrieves the individual lights in a light group from Home Assistant."""
+        return self.get_state(group_entity, attribute="entity_id") or []
 
-    def reliable_turn_on(self, light, brightness=None, transition=2, max_retries=3):
-        """Ensures the light turns on correctly, retrying if necessary."""
+    def reliable_turn_on(self, light_group, brightness=None, transition=2, max_retries=3):
+        """Ensures all lights in the group turn on correctly, retrying if necessary for individual lights."""
         
-        for attempt in range(max_retries):
-            self.turn_on(light, brightness=brightness, transition=transition)
-            time.sleep(1)  # Small delay to let HA process the state update
+        group_lights = self.get_group_lights(light_group)
+        if not group_lights:
+            self.log(f"Warning: No individual lights found for {light_group}. Using group control only.", level="WARNING")
+            group_lights = [light_group]  # Fallback to controlling the group entity itself
 
-            # Verify light state
-            if self.get_state(light) == "on":
-                self.log(f"{light} successfully turned on (Attempt {attempt + 1})")
-                return
-            else:
-                self.log(f"Attempt {attempt + 1}: {light} did not turn on, retrying...", level="WARNING")
-
-        self.log(f"Failed to turn on {light} after {max_retries} attempts!", level="ERROR")
-
-    def reliable_turn_off(self, light, transition=2, max_retries=3):
-        """Ensures the light turns off correctly, retrying if necessary."""
+        # ✅ Issue the turn_on command to the group once
+        self.turn_on(light_group, brightness=brightness, transition=transition)
         
-        for attempt in range(max_retries):
-            self.turn_off(light, transition=transition)
-            time.sleep(1)  # Small delay to let HA process the state update
+        # ✅ Wait for the transition period to complete before verification
+        time.sleep(transition * 2)
 
-            # Verify light state
-            if self.get_state(light) == "off":
-                self.log(f"{light} successfully turned off (Attempt {attempt + 1})")
+        # Verify each light in the group
+        failed_lights = [light for light in group_lights if self.get_state(light) != "on"]
+
+        if not failed_lights:
+            self.log(f"All lights in {light_group} successfully turned on.")
+            return
+        
+        self.log(f"Retrying failed lights in {light_group}: {failed_lights}", level="WARNING")
+
+        # Retry failed lights individually
+        for attempt in range(1, max_retries + 1):
+            for light in failed_lights:
+                self.turn_on(light, brightness=brightness, transition=transition)
+            
+            time.sleep(transition * 2)  # Wait again for the transition
+
+            # Check again
+            failed_lights = [light for light in failed_lights if self.get_state(light) != "on"]
+            if not failed_lights:
+                self.log(f"All remaining lights in {light_group} successfully turned on after {attempt} retry(ies).")
                 return
-            else:
-                self.log(f"Attempt {attempt + 1}: {light} did not turn off, retrying...", level="WARNING")
+        
+        self.log(f"Failed to turn on all lights in {light_group} after {max_retries} attempts!", level="ERROR")
 
-        self.log(f"Failed to turn off {light} after {max_retries} attempts!", level="ERROR")
+
+    def reliable_turn_off(self, light_group, transition=2, max_retries=3):
+        """Ensures all lights in the group turn off correctly, retrying if necessary for individual lights."""
+
+        group_lights = self.get_group_lights(light_group)
+        if not group_lights:
+            self.log(f"Warning: No individual lights found for {light_group}. Using group control only.", level="WARNING")
+            group_lights = [light_group]  # Fallback to controlling the group entity itself
+
+        # ✅ Issue the turn_off command to the group once
+        self.turn_off(light_group, transition=transition)
+
+        # ✅ Wait for the transition period to complete before verification
+        time.sleep(transition * 2)
+
+        # Verify each light in the group
+        failed_lights = [light for light in group_lights if self.get_state(light) != "off"]
+
+        if not failed_lights:
+            self.log(f"All lights in {light_group} successfully turned off.")
+            return
+
+        self.log(f"Retrying failed lights in {light_group}: {failed_lights}", level="WARNING")
+
+        # Retry failed lights individually
+        for attempt in range(1, max_retries + 1):
+            for light in failed_lights:
+                self.turn_off(light, transition=transition)
+
+            time.sleep(transition * 2)  # Wait again for the transition
+
+            # Check again
+            failed_lights = [light for light in failed_lights if self.get_state(light) != "off"]
+            if not failed_lights:
+                self.log(f"All remaining lights in {light_group} successfully turned off after {attempt} retry(ies).")
+                return
+
+        self.log(f"Failed to turn off all lights in {light_group} after {max_retries} attempts!", level="ERROR")
 
     def presence_detected(self, entity, attribute, old, new, kwargs):
         """Handles light activation/deactivation based on presence."""
@@ -263,3 +311,7 @@ class DynamicLighting(hass.Hass):
         else:
             self.log(f"Using day brightness setting for {room}: {brightness_day}% (Current time: {now}, Sunrise: {sunrise})")
             return brightness_day
+
+    def percent_to_255(self, brightness_percent):
+        """Converts 0-100% brightness to the 0-255 scale used by Home Assistant."""
+        return round((brightness_percent / 100) * 255)
